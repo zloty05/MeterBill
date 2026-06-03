@@ -11,6 +11,11 @@ from functools import lru_cache
 from supabase import Client, create_client
 
 from api.config import get_settings
+from core.ssl_setup import configure_ssl
+
+# Konfiguracja SSL pod MITM-proxy (Norton) musi zadziałać zanim powstanie
+# pierwszy klient httpx. No-op na czystym środowisku (brak certs/ca-bundle.pem).
+configure_ssl()
 
 
 @lru_cache
