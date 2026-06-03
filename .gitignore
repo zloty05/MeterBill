@@ -10,6 +10,10 @@ venv/
 .env
 .env.local
 
+# Lokalne certyfikaty CA (np. bundle pod MITM-proxy Norton) — generowane per-maszyna
+# przez scripts/build_ca_bundle.py; nie commitować.
+certs/
+
 # Node (frontend)
 node_modules/
 dist/
