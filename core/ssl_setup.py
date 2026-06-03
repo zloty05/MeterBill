@@ -64,5 +64,53 @@ def configure_ssl() -> bool:
     if not getattr(ssl.create_default_context, "_meterbill_patched", False):
         ssl.create_default_context = _patched
 
+    _patch_urllib3(bundle)
+
     _applied = True
     return True
+
+
+def _patch_urllib3(bundle: str) -> None:
+    """Łagodzi VERIFY_X509_STRICT także w torze urllib3 (requests).
+
+    httpx tworzy kontekst przez ssl.create_default_context (łapany wyżej), ale
+    urllib3 — używany przez `requests`, a więc i przez klienta Resend — buduje
+    kontekst własną funkcją create_urllib3_context, która na Python 3.13+ sama
+    dokłada VERIFY_X509_STRICT. Bez tego patcha POST /invoices/{id}/send pada na
+    maszynie dev z Nortonem (cert MITM ma Basic-Constraints nie-critical).
+
+    Jak wyżej: czyścimy wyłącznie flagę strict i dokładamy bundle CA; pełna
+    weryfikacja łańcucha i hosta zostaje. No-op gdy urllib3 nieobecny.
+    """
+    try:
+        import urllib3.util.ssl_ as u3ssl
+    except Exception:
+        return
+
+    if getattr(u3ssl.create_urllib3_context, "_meterbill_patched", False):
+        return
+
+    _orig_u3 = u3ssl.create_urllib3_context
+
+    def _patched_u3(*args, **kwargs):
+        ctx = _orig_u3(*args, **kwargs)
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+        try:
+            ctx.load_verify_locations(cafile=bundle)
+        except Exception:
+            pass
+        return ctx
+
+    _patched_u3._meterbill_patched = True
+    u3ssl.create_urllib3_context = _patched_u3
+
+    # urllib3.connection importuje create_urllib3_context do własnej przestrzeni
+    # nazw (`from .util.ssl_ import ...`) — podmiana atrybutu w util.ssl_ nie
+    # wpływa na tę referencję, więc patchujemy ją osobno. To ona jest używana
+    # przy faktycznym połączeniu (HTTPSConnection.connect, ssl_context=None).
+    try:
+        import urllib3.connection as u3conn
+        if not getattr(u3conn.create_urllib3_context, "_meterbill_patched", False):
+            u3conn.create_urllib3_context = _patched_u3
+    except Exception:
+        pass

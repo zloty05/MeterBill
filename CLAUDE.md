@@ -101,6 +101,10 @@ Przed twierdzeniem „endpoint X działa" sprawdź, czy ciało nie jest `NotImpl
   jest **no-op, dopóki nie istnieje `certs/ca-bundle.pem`**. Wygeneruj bundle:
   `python scripts/build_ca_bundle.py`. To NIE jest `verify=False` — łagodzi tylko
   `VERIFY_X509_STRICT`, pełna weryfikacja łańcucha i hosta zostaje. Na CI/prod bez MITM nieaktywne.
+  `ssl_setup` łata **dwa tory niezależnie**: httpx (Supabase) przez `ssl.create_default_context`
+  oraz urllib3/`requests` (klient Resend) przez `create_urllib3_context` w `util.ssl_` **i**
+  `urllib3.connection`. Resend domyślnie używa `requests`, więc bez patcha urllib3 `POST /send`
+  padał pod Nortonem mimo działającego bundla.
 
 ## Komendy
 
