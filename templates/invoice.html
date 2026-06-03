@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "DejaVu Sans", "Helvetica", "Arial", sans-serif;
+    font-size: 10pt; color: #1a2e1a; margin: 0;
+  }
+  h1 { font-size: 16pt; margin: 0 0 2mm; }
+  .muted { color: #5a6b5a; }
+  .right { text-align: right; }
+  .center { text-align: center; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 2px solid #2d6a2d; padding-bottom: 4mm; margin-bottom: 5mm; }
+  .header .meta { text-align: right; font-size: 9.5pt; }
+  .header .meta .no { font-size: 13pt; font-weight: bold; color: #2d6a2d; }
+
+  .parties { display: flex; gap: 8mm; margin-bottom: 5mm; }
+  .party { flex: 1; border: 1px solid #d4ddd4; border-radius: 3px; padding: 3mm 4mm; }
+  .party .label { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px;
+                  color: #5a6b5a; margin-bottom: 1.5mm; }
+  .party .name { font-weight: bold; font-size: 11pt; }
+
+  .estimated { background: #fff4e5; border: 1px solid #e0a04a; color: #8a5a00;
+               padding: 2mm 3mm; border-radius: 3px; margin-bottom: 4mm; font-size: 9pt; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  table.items th { background: #1a2e1a; color: #fff; font-size: 8.5pt; font-weight: 600;
+                   padding: 2mm; text-align: right; }
+  table.items th:first-child { text-align: left; }
+  table.items td { padding: 1.8mm 2mm; border-bottom: 1px solid #e4eae4; text-align: right; }
+  table.items td:first-child { text-align: left; }
+  table.items tbody tr:nth-child(even) { background: #f6faf6; }
+
+  .summary { display: flex; justify-content: space-between; gap: 8mm; margin-bottom: 5mm; }
+  table.vat { border-collapse: collapse; font-size: 9pt; }
+  table.vat th, table.vat td { border: 1px solid #d4ddd4; padding: 1.5mm 3mm; text-align: right; }
+  table.vat th { background: #eef4ee; }
+  .totals { min-width: 70mm; }
+  .totals .row { display: flex; justify-content: space-between; padding: 1mm 0; }
+  .totals .grand { border-top: 2px solid #2d6a2d; margin-top: 1mm; padding-top: 2mm;
+                   font-size: 12pt; font-weight: bold; color: #2d6a2d; }
+  .words { font-style: italic; margin-bottom: 5mm; }
+
+  .payment { border: 1px solid #2d6a2d; border-radius: 3px; padding: 3mm 4mm;
+             background: #f3f8f3; margin-bottom: 5mm; }
+  .payment .label { font-size: 8pt; text-transform: uppercase; color: #2d6a2d;
+                    letter-spacing: .5px; margin-bottom: 1.5mm; }
+  .payment table td { padding: 0.8mm 0; }
+  .payment table td:first-child { color: #5a6b5a; padding-right: 6mm; }
+
+  .meter-box { font-size: 9pt; color: #3a4a3a; }
+  .meter-box table { border-collapse: collapse; }
+  .meter-box td { padding: 0.8mm 4mm 0.8mm 0; }
+
+  footer { position: fixed; bottom: -12mm; left: 0; right: 0; font-size: 7.5pt;
+           color: #8a9a8a; text-align: center; }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>{{ org.name }}</h1>
+      {% if org.address %}<div class="muted">{{ org.address }}</div>{% endif %}
+      {% if org.nip %}<div class="muted">NIP: {{ org.nip }}</div>{% endif %}
+    </div>
+    <div class="meta">
+      <div class="no">Faktura {{ inv.invoice_no }}</div>
+      {% if inv.issued_date %}<div>Data wystawienia: {{ inv.issued_date|string|truncate(10, true, '') }}</div>{% endif %}
+      {% if sale_month %}<div>Miesiąc sprzedaży: {{ sale_month }}</div>{% endif %}
+      <div>Okres: {{ inv.period_from|string|truncate(10, true, '') }} – {{ inv.period_to|string|truncate(10, true, '') }}</div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="label">Sprzedawca</div>
+      <div class="name">{{ org.name }}</div>
+      {% if org.address %}<div>{{ org.address }}</div>{% endif %}
+      {% if org.nip %}<div>NIP: {{ org.nip }}</div>{% endif %}
+    </div>
+    <div class="party">
+      <div class="label">Nabywca</div>
+      <div class="name">{{ tenant.name }}</div>
+      {% if tenant.unit_no %}<div>Lokal: {{ tenant.unit_no }}</div>{% endif %}
+      {% if tenant.nip %}<div>NIP: {{ tenant.nip }}</div>{% endif %}
+      {% if tenant.email %}<div class="muted">{{ tenant.email }}</div>{% endif %}
+    </div>
+  </div>
+
+  {% if inv.is_estimated %}
+  <div class="estimated">⚠ Faktura oparta na odczycie szacowanym — wymaga potwierdzenia rzeczywistym odczytem.</div>
+  {% endif %}
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th>Nazwa</th>
+        <th>Ilość</th>
+        <th>J.m.</th>
+        <th>Cena netto</th>
+        <th>VAT</th>
+        <th>Wartość netto</th>
+        <th>Wartość brutto</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in lines %}
+      <tr>
+        <td>{{ l.label }}</td>
+        <td>{{ l.quantity|qty }}</td>
+        <td>{{ l.unit }}</td>
+        <td>{{ l.unit_price|price }}</td>
+        <td>{{ l.vat_rate|qty }}%</td>
+        <td>{{ l.net_amount|money }}</td>
+        <td>{{ l.gross_amount|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <table class="vat">
+      <thead>
+        <tr><th>Stawka VAT</th><th>Netto</th><th>VAT</th><th>Brutto</th></tr>
+      </thead>
+      <tbody>
+        {% for r in vat_rows %}
+        <tr>
+          <td>{{ r.vat_rate|qty }}%</td>
+          <td>{{ r.net_amount|money }}</td>
+          <td>{{ r.vat_amount|money }}</td>
+          <td>{{ r.gross_amount|money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <div class="row"><span>Razem netto</span><span>{{ sums.net_amount|money }} zł</span></div>
+      <div class="row"><span>Razem VAT</span><span>{{ sums.vat_amount|money }} zł</span></div>
+      <div class="row grand"><span>Do zapłaty</span><span>{{ sums.gross_amount|money }} zł</span></div>
+    </div>
+  </div>
+
+  <div class="words">Słownie: {{ amount_words }}</div>
+
+  <div class="payment">
+    <div class="label">Informacje o płatności</div>
+    <table>
+      <tr><td>Kwota</td><td><strong>{{ sums.gross_amount|money }} zł</strong></td></tr>
+      {% if inv.due_date %}<tr><td>Termin</td><td>{{ inv.due_date|string|truncate(10, true, '') }}</td></tr>{% endif %}
+      {% if org.bank_account %}<tr><td>Nr konta</td><td>{{ org.bank_account }}</td></tr>{% endif %}
+      <tr><td>Tytuł przelewu</td><td>{{ inv.invoice_no }} – {{ tenant.name }}</td></tr>
+    </table>
+  </div>
+
+  <div class="meter-box">
+    <strong>Dane pomiarowe</strong>
+    <table>
+      <tr>
+        {% if meter and meter.serial_no %}<td>Licznik: {{ meter.serial_no }}{% if meter.label %} ({{ meter.label }}){% endif %}</td>{% endif %}
+      </tr>
+      <tr>
+        <td>Odczyt poprzedni: {{ (reading_start.value_kwh if reading_start else 0)|qty }} kWh</td>
+        <td>Odczyt bieżący: {{ (reading_end.value_kwh if reading_end else 0)|qty }} kWh</td>
+        <td>Zużycie: {{ inv.kwh_consumed|qty }} kWh</td>
+      </tr>
+      {% if reading_end and reading_end.read_type %}
+      <tr><td>Typ odczytu: {{ reading_end.read_type }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  <footer>
+    Dokument wygenerowany automatycznie przez EnergyBill. Faktura {{ inv.invoice_no }}.
+  </footer>
+
+</body>
+</html>

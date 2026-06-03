@@ -28,6 +28,7 @@ class _Query:
         self._desc = False
         self._limit = None
         self._insert_payload = None
+        self._update_payload = None
 
     # --- selektory/filtry (zwracają self dla łańcuchowania) ---
     def select(self, *_args, **_kwargs):
@@ -50,25 +51,42 @@ class _Query:
         self._limit = n
         return self
 
+    def _matches(self, row) -> bool:
+        for op, col, val in self._filters:
+            if op == "eq" and str(row.get(col)) != str(val):
+                return False
+            if op == "lte" and not (str(row.get(col)) <= str(val)):
+                return False
+        return True
+
     # --- terminalne ---
     def execute(self):
         if self._insert_payload is not None:
             return self._do_insert()
-        rows = list(self._db.data.get(self._table, []))
-        for op, col, val in self._filters:
-            if op == "eq":
-                rows = [r for r in rows if str(r.get(col)) == str(val)]
-            elif op == "lte":
-                rows = [r for r in rows if str(r.get(col)) <= str(val)]
+        if self._update_payload is not None:
+            return self._do_update()
+        rows = [r for r in self._db.data.get(self._table, []) if self._matches(r)]
         if self._order is not None:
             rows.sort(key=lambda r: str(r.get(self._order) or ""), reverse=self._desc)
         if self._limit is not None:
             rows = rows[: self._limit]
-        return _Result(data=rows)
+        return _Result(data=list(rows))
 
     def insert(self, payload):
         self._insert_payload = payload
         return self
+
+    def update(self, payload):
+        self._update_payload = payload
+        return self
+
+    def _do_update(self):
+        changed = []
+        for row in self._db.data.get(self._table, []):
+            if self._matches(row):
+                row.update(self._update_payload)
+                changed.append(row)
+        return _Result(data=changed)
 
     def _do_insert(self):
         payload = self._insert_payload
@@ -97,12 +115,39 @@ class _Rpc:
         raise NotImplementedError(f"Fake RPC: {self._name}")
 
 
+class _FakeBucket:
+    """Bucket Storage in-memory: path -> bytes."""
+
+    def __init__(self, store: dict):
+        self._store = store
+
+    def upload(self, path, file, file_options=None):
+        self._store[path] = file
+        return {"path": path}
+
+    def create_signed_url(self, path, expires_in, options=None):
+        return {"signedURL": f"https://fake.storage/{path}?token=fake"}
+
+    def download(self, path):
+        return self._store.get(path, b"")
+
+
+class _FakeStorage:
+    def __init__(self):
+        self.buckets: dict = {}
+
+    def from_(self, bucket):
+        self.buckets.setdefault(bucket, {})
+        return _FakeBucket(self.buckets[bucket])
+
+
 class FakeSupabase:
-    """Fake klient: data[table] = list[dict]; sequences dla numeracji."""
+    """Fake klient: data[table] = list[dict]; sequences dla numeracji; storage."""
 
     def __init__(self, data: dict | None = None):
         self.data = data or {}
         self.sequences: dict = {}
+        self.storage = _FakeStorage()
 
     def table(self, name):
         return _Query(self, name)

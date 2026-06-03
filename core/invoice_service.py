@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from core.billing_engine import (
@@ -25,6 +25,8 @@ from core.billing_engine import (
     generate_invoice,
 )
 from core.invoice_numbering import next_invoice_no
+from core.readings import latest_reading_at_or_before as _latest_reading_at_or_before
+from core.readings import parse_date as _parse_date
 
 
 @dataclass
@@ -48,15 +50,6 @@ class GenerationResult:
     skipped: list[Skipped]
 
 
-def _parse_date(value) -> date:
-    """Akceptuje date lub ISO string (z bazy wraca jako string)."""
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if isinstance(value, datetime):
-        return value.date()
-    return date.fromisoformat(str(value)[:10])
-
-
 def _overlap_days(
     period_from: date, period_to: date, valid_from: date, valid_to: date | None
 ) -> int:
@@ -70,26 +63,6 @@ def _overlap_days(
 
 def _full_month_days(period_from: date) -> int:
     return calendar.monthrange(period_from.year, period_from.month)[1]
-
-
-def _latest_reading_at_or_before(client, meter_id: str, when: date):
-    """Ostatni odczyt licznika z read_at <= koniec dnia `when`. None jeśli brak.
-
-    `when` to data (granica okresu); porównujemy do read_at (timestamptz) używając
-    końca dnia, by złapać odczyt wykonany tego dnia.
-    """
-    upper = datetime.combine(when, datetime.max.time()).isoformat()
-    res = (
-        client.table("readings")
-        .select("value_kwh, read_at, is_estimated")
-        .eq("meter_id", meter_id)
-        .lte("read_at", upper)
-        .order("read_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    rows = res.data or []
-    return rows[0] if rows else None
 
 
 def _map_tariff(template: dict, components: list[dict]) -> Tariff:

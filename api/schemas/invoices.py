@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -71,3 +72,21 @@ class GenerateInvoicesResponse(BaseModel):
 
     generated: list[InvoiceOut] = Field(default_factory=list)
     skipped: list[SkippedTenant] = Field(default_factory=list)
+
+
+# Statusy zgodne z ENUM invoice_status w migracji 001.
+InvoiceStatus = Literal["draft", "ready", "sent", "paid", "overdue"]
+
+
+class UpdateStatusRequest(BaseModel):
+    """Body PATCH /invoices/{id}/status — ręczna zmiana statusu (MVP, bez banku)."""
+
+    status: InvoiceStatus
+
+
+class SendInvoiceResponse(BaseModel):
+    """Wynik POST /invoices/{id}/send."""
+
+    status: str
+    sent_at: datetime | None = None
+    email_id: str | None = None
