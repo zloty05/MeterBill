@@ -60,8 +60,9 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
   `GET /invoices/{id}/pdf`, `POST /invoices/{id}/send`, `PATCH /invoices/{id}/status`.
 - Autoryzacja w `api/deps.py` (JWT i X-API-Key).
 
-**Wymaga ręcznej konfiguracji (poza kodem) zanim send/pdf zadziała na prod/dev:**
-- Bucket Storage `invoices` (prywatny) w projekcie Supabase — `invoice_delivery` tam archiwizuje PDF.
+**Wymaga konfiguracji (poza kodem) zanim send/pdf zadziała na prod/dev:**
+- Bucket Storage `invoices` (prywatny) — utwórz `python scripts/create_storage_bucket.py`
+  (idempotentny; public=OFF, MIME=application/pdf). `invoice_delivery` tam archiwizuje PDF.
 - `RESEND_API_KEY` + `FROM_EMAIL` w `.env` (bez nich `POST /send` zwraca 503).
 - WeasyPrint wymaga natywnych libów (libcairo/pango); lokalnie na Windows bez GTK render PDF
   nie działa (test renderu jest pod skip) — w Dockerze wg `ENERGYBILL_MVP_PROMPT.md` l. 619.

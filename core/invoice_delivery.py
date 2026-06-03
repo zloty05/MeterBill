@@ -4,9 +4,9 @@ Warstwa I/O między routerem a czystym renderem (core/pdf_renderer). Analogiczni
 invoice_service: tu żyją zapytania do bazy, upload do Storage i wywołania Resend; sam
 render jest czysty i testowalny osobno.
 
-Storage: prywatny bucket `invoices` w projekcie Supabase (utwórz ręcznie w panelu —
-Storage → New bucket → nazwa `invoices`, „Public" = OFF). service_role ma do niego
-dostęp; portal najemcy (faza 4) dostanie podpisane URL-e. Ścieżka pliku:
+Storage: prywatny bucket `invoices` w projekcie Supabase (utwórz go skryptem
+`scripts/create_storage_bucket.py` — public=OFF, MIME=application/pdf). service_role
+ma do niego dostęp; portal najemcy (faza 4) dostanie podpisane URL-e. Ścieżka pliku:
   {org_id}/{rok}/{invoice_no_slug}.pdf
 
 Izolacja multi-tenant: każde zapytanie filtruje po org_id (backend działa na
