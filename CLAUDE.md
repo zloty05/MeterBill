@@ -39,11 +39,12 @@ core/                # czysta logika, bez zależności od web/HTTP
   invoice_delivery.py # I/O dostarczania: render PDF + upload do Storage + wysyłka Resend
   pdf_renderer.py    # czysty render faktury (Jinja2+WeasyPrint), kwota słownie, VAT per stawka
   readings.py        # współdzielone: parse_date + latest_reading_at_or_before (odczyty graniczne)
+  billing_period.py  # czyste: previous_month_period() — okres dla schedulera (bez I/O)
   ssl_setup.py       # obejście MITM (Norton) — patrz niżej
 templates/invoice.html # szablon faktury (HTML→PDF), CSS print inline, bez zewnętrznych fontów
 db/supabase_client.py # service_client() (bypass RLS) i anon_client(jwt) (kontekst usera)
 supabase/migrations/  # SQL: 001 schemat+RLS, 002 next_invoice_no(), 003 GRANT-y service_role
-tasks/               # Celery — pusty placeholder (faza scheduler)
+tasks/celery_tasks.py # Celery app + Beat: generate_all_invoices (auto-gen faktur, draft)
 tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy bez sieci)
 ```
 
@@ -57,7 +58,11 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
 - `core/pdf_renderer.py` + `templates/invoice.html` — render faktury do PDF (kwota słownie,
   VAT per stawka). `core/invoice_delivery.py` — render→Storage→Resend (krok 6).
 - `api/routers/invoices.py`: `POST /invoices/generate`, `GET /invoices`, `GET /invoices/{id}`,
-  `GET /invoices/{id}/pdf`, `POST /invoices/{id}/send`, `PATCH /invoices/{id}/status`.
+  `GET /invoices/{id}/pdf`, `POST /invoices/{id}/send`, `PATCH /invoices/{id}/status`,
+  `POST /invoices/run-scheduler` (ręczne wyzwolenie schedulera → enqueue Celery).
+- `tasks/celery_tasks.py` — Celery Beat: `generate_all_invoices` co miesiąc w dniu
+  `INVOICE_GENERATION_DAY` (6:00), za poprzedni pełny miesiąc, dla wszystkich budynków
+  wszystkich org → faktury `draft` (bez wysyłki). Idempotentny (duplikat→skipped).
 - Autoryzacja w `api/deps.py` (JWT i X-API-Key).
 
 **Wymaga konfiguracji (poza kodem) zanim send/pdf zadziała na prod/dev:**
@@ -70,7 +75,7 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
 **Stuby (`raise NotImplementedError`) — do zrobienia w kolejnych krokach:**
 - Routery `buildings, meters, readings, tenants, tariffs, organizations, portal`.
 - `POST /readings` (gateway).
-- Celery scheduler, gateway agent.
+- Gateway agent.
 
 Przed twierdzeniem „endpoint X działa" sprawdź, czy ciało nie jest `NotImplementedError`.
 

@@ -67,6 +67,22 @@ def generate_invoices(
     )
 
 
+@router.post("/run-scheduler", status_code=http_status.HTTP_202_ACCEPTED)
+def run_scheduler(_org_id: str = Depends(get_current_org)):
+    """Ręcznie wyzwala task schedulera (to samo co Celery Beat robi cyklicznie).
+
+    Wrzuca zadanie do kolejki Celery i zwraca jego id — wykonanie idzie tym
+    samym torem co harmonogram (poprzedni miesiąc, wszystkie budynki/org, draft).
+    Do testów i awaryjnego dogenerowania. Operacja administracyjna (generuje dla
+    wszystkich org); docelowo ograniczyć do roli admin.
+    """
+    # Import lokalny — moduł Celery ciągnie broker/Redis, którego API nie potrzebuje.
+    from tasks.celery_tasks import generate_all_invoices
+
+    task = generate_all_invoices.delay()
+    return {"task_id": task.id, "status": "queued"}
+
+
 @router.get("", response_model=list[InvoiceOut])
 def list_invoices(
     tenant_id: str | None = None,
