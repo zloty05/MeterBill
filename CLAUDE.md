@@ -30,8 +30,9 @@ api/
   main.py            # FastAPI app, montuje routery pod /api/v1, CORS, /health
   config.py          # Settings z .env (pydantic-settings), get_settings() z lru_cache
   deps.py            # autoryzacja: get_current_user/org (JWT), get_api_key_org (gateway)
-  routers/           # jeden plik per zasób; większość endpointów to STUBY (NotImplementedError)
-  schemas/invoices.py
+  ownership.py       # izolacja „przez rodzica" dla tabel bez org_id (assert_*_in_org)
+  routers/           # jeden plik per zasób; CRUD zrobione, `portal` + POST /readings to stuby
+  schemas/           # modele Pydantic per zasób (*Create/*Update/*Out)
 core/                # czysta logika, bez zależności od web/HTTP
   billing_engine.py  # silnik taryfowy — czyste funkcje, ZERO I/O, w pełni testowalny
   invoice_service.py # orkiestracja: pobranie z Supabase + silnik + zapis (cała warstwa I/O)
@@ -63,6 +64,15 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
 - `tasks/celery_tasks.py` — Celery Beat: `generate_all_invoices` co miesiąc w dniu
   `INVOICE_GENERATION_DAY` (6:00), za poprzedni pełny miesiąc, dla wszystkich budynków
   wszystkich org → faktury `draft` (bez wysyłki). Idempotentny (duplikat→skipped).
+- **CRUD (krok 8):** routery `organizations` (`/me` GET/PATCH), `buildings`, `tenants`,
+  `meters` (+ `/{id}/assignments`, `/{id}/readings`), `tariffs` (+ `/{id}/components`),
+  `readings` (`GET /{meter_id}`). Zakres List/Get/Create/Update (bez DELETE). Schematy w
+  `api/schemas/{organizations,buildings,tenants,meters,tariffs,readings}.py`. Izolacja org
+  „przez rodzica" w `api/ownership.py` (tabele bez własnego org_id). Testy HTTP:
+  `tests/test_api_crud.py` (TestClient + fake, override auth w `tests/conftest.py`).
+- `scripts/make_test_token.py` — seeduje usera demo w Supabase Auth + `public.users`, podpisuje
+  JWT (HS256, aud `authenticated`) → klikanie `/docs` bez frontendu. `users.id` ma FK do
+  `auth.users`, więc skrypt tworzy usera Admin API zanim wstawi profil.
 - Autoryzacja w `api/deps.py` (JWT i X-API-Key).
 
 **Wymaga konfiguracji (poza kodem) zanim send/pdf zadziała na prod/dev:**
@@ -73,8 +83,8 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
   nie działa (test renderu jest pod skip) — w Dockerze wg `ENERGYBILL_MVP_PROMPT.md` l. 619.
 
 **Stuby (`raise NotImplementedError`) — do zrobienia w kolejnych krokach:**
-- Routery `buildings, meters, readings, tenants, tariffs, organizations, portal`.
-- `POST /readings` (gateway).
+- Router `portal` (panel najemcy — token w URL).
+- `POST /readings` (gateway — przyjmowanie odczytów z M-Bus).
 - Gateway agent.
 
 Przed twierdzeniem „endpoint X działa" sprawdź, czy ciało nie jest `NotImplementedError`.

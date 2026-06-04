@@ -38,6 +38,10 @@ class _Query:
         self._filters.append(("eq", col, val))
         return self
 
+    def in_(self, col, vals):
+        self._filters.append(("in", col, list(vals)))
+        return self
+
     def lte(self, col, val):
         self._filters.append(("lte", col, val))
         return self
@@ -54,6 +58,8 @@ class _Query:
     def _matches(self, row) -> bool:
         for op, col, val in self._filters:
             if op == "eq" and str(row.get(col)) != str(val):
+                return False
+            if op == "in" and str(row.get(col)) not in {str(v) for v in val}:
                 return False
             if op == "lte" and not (str(row.get(col)) <= str(val)):
                 return False
