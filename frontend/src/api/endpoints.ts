@@ -4,7 +4,9 @@ import type {
   BuildingOut,
   BuildingUpdate,
   InvoiceOut,
+  MeterCreate,
   MeterOut,
+  MeterUpdate,
   OrgOut,
   ReadingOut,
   TenantOut,
@@ -24,6 +26,10 @@ export const updateBuilding = (id: string, body: BuildingUpdate) =>
 // ── Liczniki ──
 export const listMeters = (buildingId?: string) =>
   apiFetch<MeterOut[]>("/meters", { params: { building_id: buildingId } });
+export const createMeter = (body: MeterCreate) =>
+  apiFetch<MeterOut>("/meters", { method: "POST", body });
+export const updateMeter = (id: string, body: MeterUpdate) =>
+  apiFetch<MeterOut>(`/meters/${id}`, { method: "PATCH", body });
 export const listMeterReadings = (meterId: string) =>
   apiFetch<ReadingOut[]>(`/meters/${meterId}/readings`);
 

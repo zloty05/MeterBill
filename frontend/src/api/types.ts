@@ -54,6 +54,27 @@ export interface MeterOut {
   created_at: ISODateTime | null;
 }
 
+export interface MeterCreate {
+  building_id: UUID;
+  serial_no: string;
+  tariff_id?: UUID | null;
+  mbus_address?: string | null;
+  protocol?: MeterProtocol;
+  ppe_code?: string | null;
+  tariff_group?: string;
+  label?: string | null;
+}
+
+export interface MeterUpdate {
+  serial_no?: string | null;
+  tariff_id?: UUID | null;
+  mbus_address?: string | null;
+  protocol?: MeterProtocol | null;
+  ppe_code?: string | null;
+  tariff_group?: string | null;
+  label?: string | null;
+}
+
 export interface TenantOut {
   id: UUID;
   building_id: UUID;

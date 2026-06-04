@@ -3,6 +3,7 @@ import { getOrg } from "../../api/endpoints";
 import { useAsync } from "../../lib/useAsync";
 import { Dashboard } from "../../screens/Dashboard";
 import { Budynki } from "../../screens/Budynki";
+import { Liczniki } from "../../screens/Liczniki";
 import { Placeholder } from "../../screens/Placeholder";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -22,7 +23,7 @@ export function AppShell() {
         <Topbar title={title} orgName={orgName} />
         {screen === "dashboard" && <Dashboard onOpenBuildings={() => setScreen("budynki")} />}
         {screen === "budynki" && <Budynki />}
-        {screen === "liczniki" && <Placeholder title="Liczniki" />}
+        {screen === "liczniki" && <Liczniki />}
         {screen === "najemcy" && <Placeholder title="Najemcy" />}
         {screen === "taryfy" && <Placeholder title="Taryfy" />}
         {screen === "faktury" && <Placeholder title="Faktury" />}
