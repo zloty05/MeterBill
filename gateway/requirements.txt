@@ -1,0 +1,6 @@
+# Zależności symulatora PLC (gateway/plc_simulator.py).
+# Sam symulator do testów backendu — NIE biegnie na sterowniku.
+# Produkcyjny gateway to program Codesys na WAGO (patrz plc_post_readings.st),
+# bez żadnych pythonowych zależności.
+requests>=2.31
+PyYAML>=6.0

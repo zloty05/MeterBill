@@ -16,8 +16,10 @@ fazy, decyzje biznesowe). Ten plik to mapa stanu kodu — przy rozbieżności ź
                                     Supabase (Postgres + Auth + Storage)
 ```
 
-- **Gateway** (faza 2, jeszcze nie w repo): lokalny skrypt Python na WAGO/RPi; wysyła tylko
-  odczyty przez `POST /readings` z `X-API-Key`. Nie zna taryf ani logiki.
+- **Gateway**: sterownik WAGO 750-8217 (PFC200 + modem 4G) odczytuje liczniki (program
+  Codesys) i **sam** wysyła odczyty przez `POST /readings` z `X-API-Key` — bez pośrednika
+  (RPi zbędne, sterownik ma własne łącze 4G). Nie zna taryf ani logiki. Kontrakt, szkic
+  Codesys ST i symulator PLC w Pythonie: [gateway/README.md](gateway/README.md).
 - **Backend**: FastAPI + Supabase (`supabase-py`), Celery+Redis (scheduler — jeszcze pusty),
   WeasyPrint (PDF — jeszcze nie napisane), Resend (email — jeszcze nie napisane).
 - **Frontend** (faza 3, tylko design): React+Vite+Tailwind. Spec i design tokeny w
@@ -31,7 +33,7 @@ api/
   config.py          # Settings z .env (pydantic-settings), get_settings() z lru_cache
   deps.py            # autoryzacja: get_current_user/org (JWT), get_api_key_org (gateway)
   ownership.py       # izolacja „przez rodzica" dla tabel bez org_id (assert_*_in_org)
-  routers/           # jeden plik per zasób; CRUD zrobione, `portal` + POST /readings to stuby
+  routers/           # jeden plik per zasób; CRUD + invoices + readings + portal — zaimplementowane
   schemas/           # modele Pydantic per zasób (*Create/*Update/*Out)
 core/                # czysta logika, bez zależności od web/HTTP
   billing_engine.py  # silnik taryfowy — czyste funkcje, ZERO I/O, w pełni testowalny
@@ -47,6 +49,8 @@ templates/invoice.html # szablon faktury (HTML→PDF), CSS print inline, bez zew
 db/supabase_client.py # service_client() (bypass RLS) i anon_client(jwt) (kontekst usera)
 supabase/migrations/  # SQL: 001 schemat+RLS, 002 next_invoice_no(), 003 GRANT-y service_role
 tasks/celery_tasks.py # Celery app + Beat: generate_all_invoices (auto-gen faktur, draft)
+gateway/             # warstwa odczytów: README (kontrakt POST /readings), plc_post_readings.st
+                     #   (szkic Codesys ST dla WAGO), plc_simulator.py (symulator PLC do testów)
 tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy bez sieci)
 ```
 
@@ -71,9 +75,15 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
   `api/schemas/{organizations,buildings,tenants,meters,tariffs,readings}.py`. Izolacja org
   „przez rodzica" w `api/ownership.py` (tabele bez własnego org_id). Testy HTTP:
   `tests/test_api_crud.py` (TestClient + fake, override auth w `tests/conftest.py`).
+- **`POST /readings` (krok 9):** przyjmowanie odczytów z gateway (PLC) przez `X-API-Key`.
+  Izolacja przez `get_meter_in_org` (gateway pisze tylko do liczników swojej org),
+  `read_at` nadaje serwer gdy gateway go nie poda, idempotencja po `(meter_id, read_at)`
+  (retry → 200, bez duplikatu). Schemat `ReadingCreate`. Testy: `tests/test_readings_ingest.py`.
 - `scripts/make_test_token.py` — seeduje usera demo w Supabase Auth + `public.users`, podpisuje
   JWT (HS256, aud `authenticated`) → klikanie `/docs` bez frontendu. `users.id` ma FK do
   `auth.users`, więc skrypt tworzy usera Admin API zanim wstawi profil.
+- `scripts/make_api_key.py` — generuje klucz API gateway (`X-API-Key`): losowy klucz →
+  sha256 → `api_keys`. Plaintext wypisany **raz** (w bazie tylko hash). Domyślnie org demo.
 - Autoryzacja w `api/deps.py` (JWT i X-API-Key).
 - **Portal najemcy (krok 10):** `api/routers/portal.py` — publiczny, bez JWT, autoryzacja
   przez `portal_token` w URL. Endpointy: `GET /portal/{token}/overview`, `/readings`,
@@ -89,9 +99,11 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
 - WeasyPrint wymaga natywnych libów (libcairo/pango); lokalnie na Windows bez GTK render PDF
   nie działa (test renderu jest pod skip) — w Dockerze wg `ENERGYBILL_MVP_PROMPT.md` l. 619.
 
-**Stuby (`raise NotImplementedError`) — do zrobienia w kolejnych krokach:**
-- `POST /readings` (gateway — przyjmowanie odczytów z M-Bus).
-- Gateway agent.
+**Stuby (`raise NotImplementedError`):** brak — wszystkie routery zaimplementowane.
+
+**Gateway:** produkcyjnie to program Codesys na WAGO 750-8217 (+4G) wołający `POST /readings`
+bezpośrednio — kod żyje na sterowniku, nie w repo. W repo jest tylko kontrakt + szkic ST +
+symulator (`gateway/`). Patrz [gateway/README.md](gateway/README.md).
 
 Przed twierdzeniem „endpoint X działa" sprawdź, czy ciało nie jest `NotImplementedError`.
 
