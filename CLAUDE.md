@@ -33,7 +33,7 @@ api/
   config.py          # Settings z .env (pydantic-settings), get_settings() z lru_cache
   deps.py            # autoryzacja: get_current_user/org (JWT), get_api_key_org (gateway)
   ownership.py       # izolacja „przez rodzica" dla tabel bez org_id (assert_*_in_org)
-  routers/           # jeden plik per zasób; CRUD zrobione, `portal` + POST /readings to stuby
+  routers/           # jeden plik per zasób; CRUD + invoices + readings + portal — zaimplementowane
   schemas/           # modele Pydantic per zasób (*Create/*Update/*Out)
 core/                # czysta logika, bez zależności od web/HTTP
   billing_engine.py  # silnik taryfowy — czyste funkcje, ZERO I/O, w pełni testowalny
@@ -43,6 +43,7 @@ core/                # czysta logika, bez zależności od web/HTTP
   pdf_renderer.py    # czysty render faktury (Jinja2+WeasyPrint), kwota słownie, VAT per stawka
   readings.py        # współdzielone: parse_date + latest_reading_at_or_before (odczyty graniczne)
   billing_period.py  # czyste: previous_month_period() — okres dla schedulera (bez I/O)
+  portal_auth.py     # portal najemcy: resolve_tenant_by_token + ensure_portal_token (rotacja)
   ssl_setup.py       # obejście MITM (Norton) — patrz niżej
 templates/invoice.html # szablon faktury (HTML→PDF), CSS print inline, bez zewnętrznych fontów
 db/supabase_client.py # service_client() (bypass RLS) i anon_client(jwt) (kontekst usera)
@@ -84,16 +85,21 @@ tests/               # pytest; fake_supabase.py = in-memory fake klienta (testy 
 - `scripts/make_api_key.py` — generuje klucz API gateway (`X-API-Key`): losowy klucz →
   sha256 → `api_keys`. Plaintext wypisany **raz** (w bazie tylko hash). Domyślnie org demo.
 - Autoryzacja w `api/deps.py` (JWT i X-API-Key).
-
-**Wymaga konfiguracji (poza kodem) zanim send/pdf zadziała na prod/dev:**
+- **Portal najemcy (krok 10):** `api/routers/portal.py` — publiczny, bez JWT, autoryzacja
+  przez `portal_token` w URL. Endpointy: `GET /portal/{token}/overview`, `/readings`,
+  `/invoices`, `/invoices/{id}/pdf`. Kontekst (najemca/budynek/org) wyłącznie z tokenu
+  (`core/portal_auth.resolve_tenant_by_token`); nieważny/wygasły/nieaktywny → 404. Najemca
+  widzi tylko swoje faktury i **nie** widzi szkiców (`draft`). Token generowany/rotowany przy
+  wysyłce faktury (`ensure_portal_token` w `send_invoice_email`, TTL `portal_token_ttl_days`
+  = 90 dni; ważny token zostaje, by linki w wysłanych mailach działały). Testy:
+  `tests/test_portal.py`, `tests/test_portal_token.py`.
 - Bucket Storage `invoices` (prywatny) — utwórz `python scripts/create_storage_bucket.py`
   (idempotentny; public=OFF, MIME=application/pdf). `invoice_delivery` tam archiwizuje PDF.
 - `RESEND_API_KEY` + `FROM_EMAIL` w `.env` (bez nich `POST /send` zwraca 503).
 - WeasyPrint wymaga natywnych libów (libcairo/pango); lokalnie na Windows bez GTK render PDF
   nie działa (test renderu jest pod skip) — w Dockerze wg `ENERGYBILL_MVP_PROMPT.md` l. 619.
 
-**Stuby (`raise NotImplementedError`) — do zrobienia w kolejnych krokach:**
-- Router `portal` (panel najemcy — token w URL).
+**Stuby (`raise NotImplementedError`):** brak — wszystkie routery zaimplementowane.
 
 **Gateway:** produkcyjnie to program Codesys na WAGO 750-8217 (+4G) wołający `POST /readings`
 bezpośrednio — kod żyje na sterowniku, nie w repo. W repo jest tylko kontrakt + szkic ST +

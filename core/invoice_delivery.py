@@ -220,6 +220,13 @@ def send_invoice_email(client, org_id: str, invoice_id: str, settings) -> dict:
         {"status": "sent", "sent_at": sent_at}
     ).eq("id", invoice_id).eq("org_id", org_id).execute()
 
+    # Portal najemcy: zapewnij ważny token przy wysyłce (rotacja gdy brak/wygasł).
+    # Best-effort — nie blokuje potwierdzenia wysyłki, jeśli się nie powiedzie.
+    from core.portal_auth import ensure_portal_token
+
+    ttl = getattr(settings, "portal_token_ttl_days", 90)
+    ensure_portal_token(client, invoice["tenant_id"], ttl_days=ttl)
+
     return {"status": "sent", "sent_at": sent_at, "email_id": email_id}
 
 
