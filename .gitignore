@@ -10,6 +10,9 @@ venv/
 .env
 .env.local
 
+# Konfiguracja gatewaya z prawdziwym kluczem API (gateway/config.example.yaml zostaje)
+gateway/config.yaml
+
 # Lokalne certyfikaty CA (np. bundle pod MITM-proxy Norton) — generowane per-maszyna
 # przez scripts/build_ca_bundle.py; nie commitować.
 certs/

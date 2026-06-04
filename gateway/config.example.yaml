@@ -1,0 +1,22 @@
+# Konfiguracja symulatora PLC (gateway/plc_simulator.py).
+# Skopiuj do config.yaml i uzupełnij realnymi wartościami.
+#
+# UWAGA: api_key to plaintext klucza wygenerowanego przez
+#   python scripts/make_api_key.py
+# Trzymaj go poza repo (config.yaml jest w .gitignore).
+
+# Adres endpointu (lokalnie uvicorn → http://localhost:8000; prod → https://...)
+api_url: "http://localhost:8000/api/v1/readings"
+
+# Klucz API gateway (X-API-Key). NIE commituj prawdziwego klucza.
+api_key: "PODMIEN_NA_KLUCZ_Z_make_api_key.py"
+
+# Co ile sekund wysyłać cykl odczytów (900 = 15 min).
+interval_seconds: 900
+
+# Lista liczników: meter_id z bazy + bazowa wartość kWh (symulator narasta od niej).
+meters:
+  - meter_id: "PODMIEN_NA_UUID_LICZNIKA"
+    base_kwh: 1000.0
+  # - meter_id: "..."
+  #   base_kwh: 500.0
