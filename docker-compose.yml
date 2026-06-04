@@ -4,6 +4,9 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
+    volumes:
+      # Wyrenderowane PDF (scripts/generate_demo_invoice.py) lądują na hoście do podejrzenia.
+      - ./out:/app/out
     depends_on:
       - redis
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000

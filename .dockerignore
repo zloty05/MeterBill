@@ -1,0 +1,23 @@
+# Sekrety — do kontenera trafiają przez env_file w runtime, nie wpiekamy ich w obraz.
+.env
+.env.*
+
+# Środowiska i artefakty lokalne
+.venv/
+venv/
+out/
+certs/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Git i narzędzia
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Frontend ma własny build (osobna usługa w compose)
+frontend/node_modules/
+frontend/dist/

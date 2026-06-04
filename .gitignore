@@ -27,3 +27,6 @@ Thumbs.db
 # Build artifacts
 *.pdf
 !templates/*.pdf
+
+# Wyrenderowane faktury demo (scripts/generate_demo_invoice.py)
+out/
