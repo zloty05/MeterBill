@@ -10,9 +10,11 @@ Hybryda RLS + app-layer: nawet gdy backend działa na SERVICE_KEY (bypass RLS),
 wszystkie zapytania filtrujemy po org_id zwróconym przez te zależności.
 """
 import hashlib
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -31,14 +33,83 @@ class CurrentUser:
     role: str
 
 
+# Cache JWKS (asymetryczne klucze publiczne Supabase) — pobierane raz, odświeżane
+# co _JWKS_TTL. Supabase od trybu "JWT signing keys" podpisuje tokeny ES256 i
+# wystawia klucz publiczny pod /auth/v1/.well-known/jwks.json.
+_JWKS_TTL = 600  # sekundy
+_jwks_cache: dict | None = None
+_jwks_fetched_at: float = 0.0
+
+
+def _fetch_jwks(force: bool = False) -> dict:
+    """Pobiera (i cache'uje) JWKS Supabase. httpx korzysta z obejścia SSL
+    skonfigurowanego globalnie w db.supabase_client (MITM/Norton)."""
+    global _jwks_cache, _jwks_fetched_at
+    now = time.monotonic()
+    if not force and _jwks_cache is not None and (now - _jwks_fetched_at) < _JWKS_TTL:
+        return _jwks_cache
+    s = get_settings()
+    url = f"{s.supabase_url}/auth/v1/.well-known/jwks.json"
+    resp = httpx.get(url, timeout=10)
+    resp.raise_for_status()
+    _jwks_cache = resp.json()
+    _jwks_fetched_at = now
+    return _jwks_cache
+
+
+def _jwk_for_kid(kid: str, allow_refetch: bool = True) -> dict | None:
+    """Zwraca klucz JWK o danym kid; gdy brak, jednorazowo odświeża JWKS
+    (rotacja kluczy po stronie Supabase)."""
+    jwks = _fetch_jwks()
+    for key in jwks.get("keys", []):
+        if key.get("kid") == kid:
+            return key
+    if allow_refetch:
+        jwks = _fetch_jwks(force=True)
+        for key in jwks.get("keys", []):
+            if key.get("kid") == kid:
+                return key
+    return None
+
+
 def _decode_jwt(token: str) -> dict:
     s = get_settings()
     try:
-        # Supabase podpisuje JWT sekretem HS256; audience = "authenticated"
+        header = jwt.get_unverified_header(token)
+    except JWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Nieprawidłowy token (nagłówek)",
+        ) from exc
+
+    alg = header.get("alg", "")
+    try:
+        if alg.startswith("HS"):
+            # Stary tryb / token z make_test_token.py — sekret symetryczny.
+            return jwt.decode(
+                token,
+                s.supabase_jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+
+        # Tryb asymetryczny (ES256/RS256) — klucz publiczny z JWKS po kid.
+        kid = header.get("kid")
+        if not kid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token bez identyfikatora klucza (kid)",
+            )
+        jwk = _jwk_for_kid(kid)
+        if jwk is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Nieznany klucz podpisujący token",
+            )
         return jwt.decode(
             token,
-            s.supabase_jwt_secret,
-            algorithms=["HS256"],
+            jwk,
+            algorithms=[alg],
             audience="authenticated",
         )
     except JWTError as exc:
