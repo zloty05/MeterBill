@@ -4,6 +4,7 @@ import { useAsync } from "../../lib/useAsync";
 import { Dashboard } from "../../screens/Dashboard";
 import { Budynki } from "../../screens/Budynki";
 import { Liczniki } from "../../screens/Liczniki";
+import { Najemcy } from "../../screens/Najemcy";
 import { Placeholder } from "../../screens/Placeholder";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -24,7 +25,7 @@ export function AppShell() {
         {screen === "dashboard" && <Dashboard onOpenBuildings={() => setScreen("budynki")} />}
         {screen === "budynki" && <Budynki />}
         {screen === "liczniki" && <Liczniki />}
-        {screen === "najemcy" && <Placeholder title="Najemcy" />}
+        {screen === "najemcy" && <Najemcy />}
         {screen === "taryfy" && <Placeholder title="Taryfy" />}
         {screen === "faktury" && <Placeholder title="Faktury" />}
       </div>

@@ -86,6 +86,23 @@ export interface TenantOut {
   created_at: ISODateTime | null;
 }
 
+export interface TenantCreate {
+  building_id: UUID;
+  name: string;
+  email: string;
+  unit_no: string;
+  nip?: string | null;
+  active?: boolean;
+}
+
+export interface TenantUpdate {
+  name?: string | null;
+  email?: string | null;
+  unit_no?: string | null;
+  nip?: string | null;
+  active?: boolean | null;
+}
+
 export interface ReadingOut {
   id: UUID;
   meter_id: UUID;

@@ -9,7 +9,9 @@ import type {
   MeterUpdate,
   OrgOut,
   ReadingOut,
+  TenantCreate,
   TenantOut,
+  TenantUpdate,
 } from "./types";
 
 // ── Organizacja ──
@@ -36,6 +38,10 @@ export const listMeterReadings = (meterId: string) =>
 // ── Najemcy ──
 export const listTenants = (buildingId?: string) =>
   apiFetch<TenantOut[]>("/tenants", { params: { building_id: buildingId } });
+export const createTenant = (body: TenantCreate) =>
+  apiFetch<TenantOut>("/tenants", { method: "POST", body });
+export const updateTenant = (id: string, body: TenantUpdate) =>
+  apiFetch<TenantOut>(`/tenants/${id}`, { method: "PATCH", body });
 
 // ── Faktury ──
 export const listInvoices = (params?: { tenant_id?: string; status?: string }) =>
